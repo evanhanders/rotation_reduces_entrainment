@@ -32,7 +32,7 @@ dtype = np.float64
 
 # Bases
 coords = d3.CartesianCoordinates('x', 'y', 'z')
-dist = d3.Distributor(coords, dtype=dtype)
+dist = d3.Distributor(coords, dtype=dtype,mesh=[2,2])
 xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, aspect), dealias=dealias)
 ybasis = d3.RealFourier(coords['y'], size=Nx, bounds=(0, aspect), dealias=dealias)
 zbasis = d3.ChebyshevT(coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
@@ -140,6 +140,11 @@ snapshots.add_task((ez@d3.curl(u))(x=aspect/2), name='vorticity yz')
 snapshots.add_task((ez@d3.curl(u))(y=aspect/2), name='vorticity xz')
 snapshots.add_task((ez@d3.curl(u))(z=0.9), name='vorticity xy')
 
+snapshots.add_task((ez@u)(z=0.9), name='vertical velocity')
+snapshots.add_task((0.5*u@u)(z=0.9), name='kinetic energy')
+
+
+
 plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])
 profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.1, max_writes=50)
 profiles.add_task(plane_avg(T), name='T')
@@ -153,7 +158,6 @@ profiles.add_task(plane_avg(dot(u,(T - inv_R*C)*ez)), name='Buoyancy_flux')
 profiles.add_task(plane_avg(nu*dot(vorticity,vorticity)), name='Dissipation')
 profiles.add_task(plane_avg(dot(ez,u*p)), name='pressure_flux')
 profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_flux')
-
 profiles.add_task(plane_avg(FK_vert), name='KE_vert')
 profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
 
