@@ -5,6 +5,7 @@ Dedalus script simulating 3D rotationally-constrainted, compositionally-stabiliz
 import numpy as np
 import dedalus.public as d3
 import logging
+from mpi4py import MPI
 logger = logging.getLogger(__name__)
 
 #Heaviside functions
@@ -30,9 +31,15 @@ timestepper = d3.SBDF2
 max_timestep = 0.125
 dtype = np.float64
 
+ncpu = MPI.COMM_WORLD.size
+log2 = np.log2(ncpu)
+if log2 == int(log2):
+    mesh = [int(2**np.ceil(log2/2)),int(2**np.floor(log2/2))]
+logger.info("running on processor mesh={}".format(mesh))
+
 # Bases
 coords = d3.CartesianCoordinates('x', 'y', 'z')
-dist = d3.Distributor(coords, dtype=dtype)
+dist = d3.Distributor(coords, dtype=dtype, mesh=mesh)
 xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, aspect), dealias=dealias)
 ybasis = d3.RealFourier(coords['y'], size=Nx, bounds=(0, aspect), dealias=dealias)
 zbasis = d3.ChebyshevT(coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
