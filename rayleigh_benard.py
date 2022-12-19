@@ -44,6 +44,7 @@ tau_C2 = dist.Field(name='tau_C2', bases=horiz_bases)
 tau_u1 = dist.VectorField(coords, name='tau_u1', bases=horiz_bases)
 tau_u2 = dist.VectorField(coords, name='tau_u2', bases=horiz_bases)
 
+
 # Substitutions
 kappaT = (Rayleigh * Prandtl)**(-1/2)
 kappaC = tau * kappaT
@@ -57,6 +58,20 @@ grad_u = d3.grad(u) + ez*lift(tau_u1) # First-order reduction
 grad_T = d3.grad(T) + ez*lift(tau_T1) # First-order reduction
 grad_C = d3.grad(C) + ez*lift(tau_C1) # First-order reduction
 
+#for stress-free BCs
+strain_rate = d3.grad(u) + d3.trans(d3.grad(u))
+shear_stress = ez@(strain_rate(z=Lz))
+
+#Initial / Background profiles
+T['g'] = T0 = 1 - z
+C['g'] = C0 = 1 - z
+
+T0_bot = T(z=0).evaluate()
+C0_bot = C(z=0).evaluate()
+
+#TODO: get this from Rayleigh number
+F = -10
+
 # Problem
 # First-order form: "div(f)" becomes "trace(grad_f)"
 # First-order form: "lap(f)" becomes "div(grad_f)"
@@ -65,12 +80,14 @@ problem.add_equation("trace(grad_u) + tau_p = 0")
 problem.add_equation("dt(T) - kappaT*div(grad_T) + lift(tau_T2) = - u@grad(T)")
 problem.add_equation("dt(C) - kappaC*div(grad_C) + lift(tau_C2) = - u@grad(C)")
 problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omega*(cross(ez,u)) + lift(tau_u2) = - u@grad(u)")
-problem.add_equation("C(z=0) = 0")
-problem.add_equation("T(z=0) = Lz")
+problem.add_equation("C(z=0) = C0_bot")
+problem.add_equation("T(z=0) = T0_bot")
 problem.add_equation("u(z=0) = 0")
-problem.add_equation("C(z=Lz) = 0")
-problem.add_equation("T(z=Lz) = 0")
-problem.add_equation("u(z=Lz) = 0")
+problem.add_equation("ez@(grad(C)(z=Lz)) = 0")
+problem.add_equation("ez@(grad(T)(z=Lz)) = F")
+problem.add_equation("ez@(u(z=Lz)) = 0")
+problem.add_equation("ex@shear_stress = 0")
+problem.add_equation("ey@shear_stress = 0")
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
 # Solver
@@ -78,9 +95,9 @@ solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
 
 # Initial conditions
-T.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
-T['g'] *= z * (Lz - z) # Damp noise at walls
-T['g'] += Lz - z # Add linear background
+noise = dist.Field(name='noise', bases=bases)
+noise.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
+T['g'] += noise['g']
 
 # Analysis
 snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
