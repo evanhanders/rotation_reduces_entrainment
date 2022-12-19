@@ -17,16 +17,16 @@ def zero_to_one(*args, **kwargs):
 
 
 # Parameters
-aspect, Lz = 4, 1
+aspect, Lz = 1, 1
 Nx, Nz = 64, 64
-Rayleigh = 1e6
+Rayleigh = 1e8
 Prandtl = 0.5
 Taylor = 1
 tau = Prandtl
-inv_R = 10
+inv_R = 3
 dealias = 3/2
-stop_sim_time = 50
-timestepper = d3.RK222
+stop_sim_time = 100
+timestepper = d3.SBDF2
 max_timestep = 0.125
 dtype = np.float64
 
@@ -67,6 +67,15 @@ grad_u = d3.grad(u) + ez*lift(tau_u1) # First-order reduction
 grad_T = d3.grad(T) + ez*lift(tau_T1) # First-order reduction
 grad_C = d3.grad(C) + ez*lift(tau_C1) # First-order reduction
 
+# operators
+
+grad = lambda A: d3.Gradient(A, coords)
+dot = d3.DotProduct
+vorticity = d3.curl(u)
+
+FK_vert = dot(ez,u)**2
+FK_parallel = dot(ex,u)**2 + dot(ey,u)**2
+
 #for stress-free BCs
 strain_rate = d3.grad(u) + d3.trans(d3.grad(u))
 shear_stress = ez@(strain_rate(z=Lz))
@@ -86,9 +95,9 @@ T0z_top = (ez@(d3.grad(T)(z=Lz))).evaluate()
 # First-order form: "lap(f)" becomes "div(grad_f)"
 problem = d3.IVP([p, T, C, u, tau_p, tau_T1, tau_T2, tau_C1, tau_C2, tau_u1, tau_u2], namespace=locals())
 problem.add_equation("trace(grad_u) + tau_p = 0")
-problem.add_equation("dt(T) - kappaT*div(grad_T) + lift(tau_T2) = - u@grad(T)")
-problem.add_equation("dt(C) - kappaC*div(grad_C) + lift(tau_C2) = - u@grad(C)")
-problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omega*(cross(ez,u)) + lift(tau_u2) = - u@grad(u)")
+problem.add_equation("dt(T) - kappaT*div(grad_T) + lift(tau_T2) = - (u@grad(T))")
+problem.add_equation("dt(C) - kappaC*div(grad_C) + lift(tau_C2) = - (u@grad(C))")
+problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omega*(cross(ez,u)) + lift(tau_u2) = - cross(vorticity,u)")
 problem.add_equation("C(z=0) = C0_bot")
 problem.add_equation("T(z=0) = T0_bot")
 problem.add_equation("u(z=0) = 0")
@@ -126,12 +135,31 @@ snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writ
 snapshots.add_task((T - inv_R*C)(x=aspect/2), name='buoyancy yz')
 snapshots.add_task((T - inv_R*C)(y=aspect/2), name='buoyancy xz')
 snapshots.add_task((T - inv_R*C)(z=0.9), name='buoyancy xy')
+
 snapshots.add_task((ez@d3.curl(u))(x=aspect/2), name='vorticity yz')
 snapshots.add_task((ez@d3.curl(u))(y=aspect/2), name='vorticity xz')
 snapshots.add_task((ez@d3.curl(u))(z=0.9), name='vorticity xy')
 
+plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])
+profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.1, max_writes=50)
+profiles.add_task(plane_avg(T), name='T')
+profiles.add_task(plane_avg(dot(ez, u*T)), name='T_conv_flux')
+profiles.add_task(plane_avg(dot(ez, grad(T))), name='T_grad')
+profiles.add_task(plane_avg(C), name='C')
+profiles.add_task(plane_avg(dot(ez, u*C)), name='C_conv_flux')
+profiles.add_task(plane_avg(dot(ez, grad(C))), name='C_grad')
+profiles.add_task(plane_avg(dot(ez, 0.5*u*dot(u,u))), name='KE_flux')
+profiles.add_task(plane_avg(dot(u,(T - inv_R*C)*ez)), name='Buoyancy_flux')
+profiles.add_task(plane_avg(nu*dot(vorticity,vorticity)), name='Dissipation')
+profiles.add_task(plane_avg(dot(ez,u*p)), name='pressure_flux')
+profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_flux')
+
+profiles.add_task(plane_avg(FK_vert), name='KE_vert')
+profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
+
+
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=10, safety=0.5, threshold=0.05,
+CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.25, threshold=0.05,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
