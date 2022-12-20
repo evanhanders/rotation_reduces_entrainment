@@ -24,6 +24,7 @@ Rayleigh = 1e8
 Prandtl = 0.5
 Taylor = 1
 tau = Prandtl
+tau_bg = 1e-3
 inv_R = 3
 dealias = 3/2
 stop_sim_time = 100
@@ -63,6 +64,7 @@ tau_u2 = dist.VectorField(coords, name='tau_u2', bases=horiz_bases)
 # Substitutions
 kappaT = (Rayleigh * Prandtl)**(-1/2)
 kappaC = tau * kappaT
+kappaC_bg = tau_bg * kappaT
 nu = (Rayleigh / Prandtl)**(-1/2)
 omega = (Taylor * Prandtl / Rayleigh)**(1/2)
 x, y, z = dist.local_grids(xbasis, ybasis, zbasis)
@@ -103,7 +105,8 @@ T0z_top = (ez@(d3.grad(T)(z=Lz))).evaluate()
 problem = d3.IVP([p, T, C, u, tau_p, tau_T1, tau_T2, tau_C1, tau_C2, tau_u1, tau_u2], namespace=locals())
 problem.add_equation("trace(grad_u) + tau_p = 0")
 problem.add_equation("dt(T) - kappaT*div(grad_T) + lift(tau_T2) = - (u@grad(T))")
-problem.add_equation("dt(C) - kappaC*div(grad_C) + lift(tau_C2) = - (u@grad(C))")
+problem.add_equation("dt(C) - kappaC*div(grad_C)    + lift(tau_C2) = - (u@grad(C))", condition="(nx != 0) or  (ny != 0)")
+problem.add_equation("dt(C) - kappaC_bg*div(grad_C) + lift(tau_C2) = - (u@grad(C))", condition="(nx == 0) and (ny == 0)")
 problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omega*(cross(ez,u)) + lift(tau_u2) = - cross(vorticity,u)")
 problem.add_equation("C(z=0) = C0_bot")
 problem.add_equation("T(z=0) = T0_bot")
