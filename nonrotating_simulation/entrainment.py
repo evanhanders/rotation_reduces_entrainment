@@ -150,6 +150,7 @@ solver.stop_sim_time = stop_sim_time
 # Initial conditions
 noise = dist.Field(name='noise', bases=bases)
 noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
+noise.low_pass_filter(scales=0.25)
 
 noise.change_scales(dealias)
 T.change_scales(dealias)
