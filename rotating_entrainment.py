@@ -18,8 +18,8 @@ def zero_to_one(*args, **kwargs):
 
 
 # Parameters
-aspect, Lz = 1, 1
-Nx, Nz = 64, 64
+aspect, Lz = 1, 2
+Nx, Nz = 4, 64
 Rayleigh = 1e8
 Prandtl = 0.5
 Taylor = 1
@@ -41,8 +41,8 @@ logger.info("running on processor mesh={}".format(mesh))
 # Bases
 coords = d3.CartesianCoordinates('x', 'y', 'z')
 dist = d3.Distributor(coords, dtype=dtype, mesh=mesh)
-xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, aspect), dealias=dealias)
-ybasis = d3.RealFourier(coords['y'], size=Nx, bounds=(0, aspect), dealias=dealias)
+xbasis = d3.RealFourier(coords['x'], size=Nx, bounds=(0, aspect*Lz), dealias=dealias)
+ybasis = d3.RealFourier(coords['y'], size=Nx, bounds=(0, aspect*Lz), dealias=dealias)
 zbasis = d3.ChebyshevT(coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
 
 # Fields
@@ -90,8 +90,8 @@ strain_rate = d3.grad(u) + d3.trans(d3.grad(u))
 shear_stress = ez@(strain_rate(z=Lz))
 
 #Initial / Background profiles
-T['g'] = T0 = 1 - z
-C['g'] = C0 = 1 - z
+T['g'] = T0 = (Lz - z)
+C['g'] = C0 = (Lz - z)
 
 T0_bot = T(z=0).evaluate()
 C0_bot = C(z=0).evaluate()
@@ -131,27 +131,27 @@ T.change_scales(dealias)
 C.change_scales(dealias)
 T['g'] += noise['g']
 
-C['g'] *= one_to_zero(z_de, 0.8, width=0.05)
-C['g'] += 0.1*zero_to_one(z_de, 0.8, width=0.05)
+C['g'] *= one_to_zero(z_de, 0.5*Lz, width=0.05*Lz)
+C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05*Lz)
 
-#import matplotlib.pyplot as plt
-#plt.plot(z_de.ravel(), C['g'][0,0,:], label='C')
-#plt.plot(z_de.ravel(), T['g'][0,0,:], label='T')
-#plt.legend()
-#plt.show()
+import matplotlib.pyplot as plt
+plt.plot(z_de.ravel(), C['g'][0,0,:], label='C')
+plt.plot(z_de.ravel(), T['g'][0,0,:], label='T')
+plt.legend()
+plt.show()
 
 # Analysis
 snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
-snapshots.add_task((T - inv_R*C)(x=aspect/2), name='buoyancy yz')
-snapshots.add_task((T - inv_R*C)(y=aspect/2), name='buoyancy xz')
-snapshots.add_task((T - inv_R*C)(z=0.9), name='buoyancy xy')
+snapshots.add_task((T - inv_R*C)(x=aspect*Lz/2), name='buoyancy yz')
+snapshots.add_task((T - inv_R*C)(y=aspect*Lz/2), name='buoyancy xz')
+snapshots.add_task((T - inv_R*C)(z=0.75*Lz), name='buoyancy xy')
 
-snapshots.add_task((ez@d3.curl(u))(x=aspect/2), name='vorticity yz')
-snapshots.add_task((ez@d3.curl(u))(y=aspect/2), name='vorticity xz')
-snapshots.add_task((ez@d3.curl(u))(z=0.9), name='vorticity xy')
+snapshots.add_task((ez@d3.curl(u))(x=aspect*Lz/2), name='vorticity yz')
+snapshots.add_task((ez@d3.curl(u))(y=aspect*Lz/2), name='vorticity xz')
+snapshots.add_task((ez@d3.curl(u))(z=0.75*Lz), name='vorticity xy')
 
-snapshots.add_task((ez@u)(z=0.9), name='vertical velocity')
-snapshots.add_task((0.5*u@u)(z=0.9), name='kinetic energy')
+snapshots.add_task((ez@u)(z=0.75*Lz), name='vertical velocity')
+snapshots.add_task((0.5*u@u)(z=0.75*Lz), name='kinetic energy')
 
 
 
@@ -159,9 +159,11 @@ plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])
 profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.1, max_writes=50)
 profiles.add_task(plane_avg(T), name='T')
 profiles.add_task(plane_avg(dot(ez, u*T)), name='T_conv_flux')
+profiles.add_task(plane_avg(dot(ez, -kappaT*grad(T))), name='T_cond_flux')
 profiles.add_task(plane_avg(dot(ez, grad(T))), name='T_grad')
 profiles.add_task(plane_avg(C), name='C')
 profiles.add_task(plane_avg(dot(ez, u*C)), name='C_conv_flux')
+profiles.add_task(plane_avg(dot(ez, -kappaC_bg*grad(C))), name='C_cond_flux')
 profiles.add_task(plane_avg(dot(ez, grad(C))), name='C_grad')
 profiles.add_task(plane_avg(dot(ez, 0.5*u*dot(u,u))), name='KE_flux')
 profiles.add_task(plane_avg(dot(u,(T - inv_R*C)*ez)), name='Buoyancy_flux')
