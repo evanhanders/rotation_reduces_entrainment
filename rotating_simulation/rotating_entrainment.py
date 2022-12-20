@@ -149,7 +149,7 @@ solver.stop_sim_time = stop_sim_time
 
 # Initial conditions
 noise = dist.Field(name='noise', bases=bases)
-noise.fill_random('g', seed=42, distribution='normal', scale=1e-3) # Random noise
+noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
 
 noise.change_scales(dealias)
 T.change_scales(dealias)
@@ -169,11 +169,19 @@ C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
 snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
 snapshots.add_task((T - inv_R*C)(x=aspect*Lz/2), name='buoyancy yz')
 snapshots.add_task((T - inv_R*C)(y=aspect*Lz/2), name='buoyancy xz')
+snapshots.add_task((T - inv_R*C)(x=aspect*Lz), name='buoyancy yz side')
+snapshots.add_task((T - inv_R*C)(y=aspect*Lz), name='buoyancy xz side')
 snapshots.add_task((T - inv_R*C)(z=0.75*Lz), name='buoyancy xy')
+snapshots.add_task((T - inv_R*C)(z=0.5*Lz), name='buoyancy xy mid')
+snapshots.add_task((T - inv_R*C)(z=0.975*Lz), name='buoyancy xy near top')
 
 snapshots.add_task((ez@d3.curl(u))(x=aspect*Lz/2), name='vorticity yz')
 snapshots.add_task((ez@d3.curl(u))(y=aspect*Lz/2), name='vorticity xz')
+snapshots.add_task((ez@d3.curl(u))(x=aspect*Lz), name='vorticity yz side')
+snapshots.add_task((ez@d3.curl(u))(y=aspect*Lz), name='vorticity xz side')
 snapshots.add_task((ez@d3.curl(u))(z=0.75*Lz), name='vorticity xy')
+snapshots.add_task((ez@d3.curl(u))(z=0.5*Lz), name='vorticity xy mid')
+snapshots.add_task((ez@d3.curl(u))(z=0.975*Lz), name='vorticity xy near top')
 
 snapshots.add_task((ez@u)(z=0.75*Lz), name='vertical velocity')
 snapshots.add_task((0.5*u@u)(z=0.75*Lz), name='kinetic energy')
@@ -198,9 +206,13 @@ profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_fl
 profiles.add_task(plane_avg(FK_vert), name='KE_vert')
 profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
 
+# Checkpoint
+checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='virtual')
+checkpoint.add_tasks(solver.state, layout='g')
+
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=cfl_safety, threshold=0.05,
+CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=cfl_safety, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
@@ -219,7 +231,7 @@ try:
         if (solver.iteration-1) % 10 == 0:
             max_Re = flow.max('Re')
             max_Ro = flow.max('Ro_bulk')
-            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re, max_Ro))
+            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f, max(Ro)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re, max_Ro))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
