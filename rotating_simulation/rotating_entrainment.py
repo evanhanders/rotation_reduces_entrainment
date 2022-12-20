@@ -17,21 +17,15 @@ def zero_to_one(*args, **kwargs):
     return -(one_to_zero(*args, **kwargs) - 1)
 
 
-# Parameters
-aspect, Lz = 1, 2
-Nx, Nz = 4, 64
-Rayleigh = 1e8
-Prandtl = 0.5
-Taylor = 1
-tau = Prandtl
-tau_bg = 1e-3
-inv_R = 3
-dealias = 3/2
-stop_sim_time = 100
+# Parameters - load in from parameter file (Nx, Nz, Ra, Pr, etc)
+from control_parameters import parameters
+locals().update(parameters)
+
+# Additional Parameters
 timestepper = d3.SBDF2
+cfl_safety = 0.2
 max_timestep = 0.125
 dtype = np.float64
-
 ncpu = MPI.COMM_WORLD.size
 log2 = np.log2(ncpu)
 if log2 == int(log2):
@@ -206,13 +200,14 @@ profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
 
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=0.25, threshold=0.05,
+CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=cfl_safety, threshold=0.05,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
 # Flow properties
 flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u@u)/nu, name='Re')
+flow.add_property(np.sqrt(u@u)/omega, name='Ro_bulk')
 
 # Main loop
 startup_iter = 10
@@ -223,7 +218,8 @@ try:
         solver.step(timestep)
         if (solver.iteration-1) % 10 == 0:
             max_Re = flow.max('Re')
-            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re))
+            max_Ro = flow.max('Ro_bulk')
+            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re, max_Ro))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise
