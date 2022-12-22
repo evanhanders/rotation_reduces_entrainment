@@ -24,7 +24,7 @@ locals().update(parameters)
 # Additional Parameters
 timestepper = d3.SBDF2
 cfl_safety = 0.2
-max_timestep = 0.125
+max_timestep = 0.25
 dtype = np.float64
 ncpu = MPI.COMM_WORLD.size
 log2 = np.log2(ncpu)
@@ -167,22 +167,23 @@ C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
 #plt.savefig('IC_{}.png'.format(MPI.COMM_WORLD.rank))
 
 # Analysis
+buoyancy = T - inv_R*C
 snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
-snapshots.add_task((T - inv_R*C)(x=aspect*Lz/2), name='buoyancy yz')
-snapshots.add_task((T - inv_R*C)(y=aspect*Lz/2), name='buoyancy xz')
-snapshots.add_task((T - inv_R*C)(x=aspect*Lz), name='buoyancy yz side')
-snapshots.add_task((T - inv_R*C)(y=aspect*Lz), name='buoyancy xz side')
-snapshots.add_task((T - inv_R*C)(z=0.75*Lz), name='buoyancy xy')
-snapshots.add_task((T - inv_R*C)(z=0.5*Lz), name='buoyancy xy mid')
-snapshots.add_task((T - inv_R*C)(z=0.975*Lz), name='buoyancy xy near top')
+snapshots.add_task(buoyancy(x=aspect*Lz/2), name='buoyancy yz')
+snapshots.add_task(buoyancy(y=aspect*Lz/2), name='buoyancy xz')
+snapshots.add_task(buoyancy(x=aspect*Lz), name='buoyancy yz side')
+snapshots.add_task(buoyancy(y=aspect*Lz), name='buoyancy xz side')
+snapshots.add_task(buoyancy(z=0.75*Lz), name='buoyancy xy')
+snapshots.add_task(buoyancy(z=0.5*Lz), name='buoyancy xy mid')
+snapshots.add_task(buoyancy(z=0.975*Lz), name='buoyancy xy near top')
 
-snapshots.add_task((ez@d3.curl(u))(x=aspect*Lz/2), name='vorticity yz')
-snapshots.add_task((ez@d3.curl(u))(y=aspect*Lz/2), name='vorticity xz')
-snapshots.add_task((ez@d3.curl(u))(x=aspect*Lz), name='vorticity yz side')
-snapshots.add_task((ez@d3.curl(u))(y=aspect*Lz), name='vorticity xz side')
-snapshots.add_task((ez@d3.curl(u))(z=0.75*Lz), name='vorticity xy')
-snapshots.add_task((ez@d3.curl(u))(z=0.5*Lz), name='vorticity xy mid')
-snapshots.add_task((ez@d3.curl(u))(z=0.975*Lz), name='vorticity xy near top')
+snapshots.add_task((ez@vorticity)(x=aspect*Lz/2), name='vorticity yz')
+snapshots.add_task((ez@vorticity)(y=aspect*Lz/2), name='vorticity xz')
+snapshots.add_task((ez@vorticity)(x=aspect*Lz), name='vorticity yz side')
+snapshots.add_task((ez@vorticity)(y=aspect*Lz), name='vorticity xz side')
+snapshots.add_task((ez@vorticity)(z=0.75*Lz), name='vorticity xy')
+snapshots.add_task((ez@vorticity)(z=0.5*Lz), name='vorticity xy mid')
+snapshots.add_task((ez@vorticity)(z=0.975*Lz), name='vorticity xy near top')
 
 snapshots.add_task((ez@u)(z=0.75*Lz), name='vertical velocity')
 snapshots.add_task((0.5*u@u)(z=0.75*Lz), name='kinetic energy')
@@ -206,9 +207,12 @@ profiles.add_task(plane_avg(dot(ez,u*p)), name='pressure_flux')
 profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_flux')
 profiles.add_task(plane_avg(FK_vert), name='KE_vert')
 profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
+profiles.add_task(np.sqrt(u@u)/omega, name='Ro_bulk')
+profiles.add_task(np.sqrt(vorticity@vorticity)/omega, name='Ro_vort')
+profiles.add_task(np.sqrt((vorticity@ez)**2)/omega, name='Ro_z_vort')
 
 # Checkpoint
-checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='virtual')
+checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='gather')
 checkpoint.add_tasks(solver.state, layout='g')
 
 
@@ -221,6 +225,7 @@ CFL.add_velocity(u)
 flow = d3.GlobalFlowProperty(solver, cadence=10)
 flow.add_property(np.sqrt(u@u)/nu, name='Re')
 flow.add_property(np.sqrt(u@u)/omega, name='Ro_bulk')
+flow.add_property(np.sqrt(vorticity@vorticity)/omega, name='Ro_vort')
 
 # Main loop
 startup_iter = 10
@@ -230,9 +235,10 @@ try:
         timestep = CFL.compute_timestep()
         solver.step(timestep)
         if (solver.iteration-1) % 10 == 0:
-            max_Re = flow.max('Re')
-            max_Ro = flow.max('Ro_bulk')
-            logger.info('Iteration=%i, Time=%e, dt=%e, max(Re)=%f, max(Ro)=%f' %(solver.iteration, solver.sim_time, timestep, max_Re, max_Ro))
+            avg_Re      = flow.grid_average('Re')
+            avg_Ro_bulk = flow.grid_average('Ro_bulk')
+            avg_Ro_vort = flow.grid_average('Ro_vort')
+            logger.info('Iteration=%i, Time=%e, dt=%e, avg(Re)=%f, avg(Ro)=%f / %f' %(solver.iteration, solver.sim_time, timestep, avg_Re, avg_Ro_bulk, avg_Ro_vort))
 except:
     logger.error('Exception raised, triggering end of main loop.')
     raise

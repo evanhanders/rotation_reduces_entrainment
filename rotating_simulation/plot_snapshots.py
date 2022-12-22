@@ -8,7 +8,7 @@ data_dir    = 'snapshots'
 start_fig   = 1
 start_file  = 1
 out_name    = 'snapshots_horiz'
-n_files     = 15
+n_files     = int(1e6)
 
 # Create Plotter object, tell it which fields to plot
 plotter = SlicePlotter(root_dir, file_dir=data_dir, out_name=out_name, start_file=start_file, n_files=n_files)
