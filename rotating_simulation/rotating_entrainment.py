@@ -207,9 +207,9 @@ profiles.add_task(plane_avg(dot(ez,u*p)), name='pressure_flux')
 profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_flux')
 profiles.add_task(plane_avg(FK_vert), name='KE_vert')
 profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
-profiles.add_task(np.sqrt(u@u)/omega, name='Ro_bulk')
-profiles.add_task(np.sqrt(vorticity@vorticity)/omega, name='Ro_vort')
-profiles.add_task(np.sqrt((vorticity@ez)**2)/omega, name='Ro_z_vort')
+profiles.add_task(plane_avg(np.sqrt(u@u)/omega), name='Ro_bulk')
+profiles.add_task(plane_avg(np.sqrt(vorticity@vorticity)/omega), name='Ro_vort')
+profiles.add_task(plane_avg(np.sqrt((vorticity@ez)**2)/omega), name='Ro_z_vort')
 
 # Checkpoint
 checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='gather')
