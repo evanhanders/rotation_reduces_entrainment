@@ -8,10 +8,10 @@ parameters['aspect'] = 0.5
 
 parameters['Rayleigh'] = 1e8
 parameters['Prandtl'] = 0.5
-parameters['Taylor'] = 1e10
+parameters['Taylor'] = 3e9
 parameters['tau'] = parameters['Prandtl']
 parameters['tau_bg'] = 4e-3
-parameters['inv_R'] = 3
+parameters['inv_R'] = 2.5
 parameters['dealias'] = 3/2
-parameters['stop_sim_time'] = 1e4
+parameters['stop_sim_time'] = 2e4
 

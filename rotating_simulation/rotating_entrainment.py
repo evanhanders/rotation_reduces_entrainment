@@ -168,7 +168,7 @@ C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
 
 # Analysis
 buoyancy = T - inv_R*C
-snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=1, max_writes=50)
 snapshots.add_task(buoyancy(x=aspect*Lz/2), name='buoyancy yz')
 snapshots.add_task(buoyancy(y=aspect*Lz/2), name='buoyancy xz')
 snapshots.add_task(buoyancy(x=aspect*Lz), name='buoyancy yz side')
@@ -191,7 +191,7 @@ snapshots.add_task((0.5*u@u)(z=0.75*Lz), name='kinetic energy')
 
 
 plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])
-profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.1, max_writes=50)
+profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.5, max_writes=50)
 profiles.add_task(plane_avg(T), name='T')
 profiles.add_task(plane_avg(dot(ez, u*T)), name='T_conv_flux')
 profiles.add_task(plane_avg(dot(ez, -kappaT*grad(T))), name='T_cond_flux')
