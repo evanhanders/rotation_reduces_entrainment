@@ -83,6 +83,7 @@ FK_parallel = dot(ex,u)**2 + dot(ey,u)**2
 strain_rate = d3.grad(u) + d3.trans(d3.grad(u))
 shear_stress = ez@(strain_rate(z=Lz))
 
+
 #Initial / Background profiles
 T['g'] = T0 = (Lz - z)
 C['g'] = C0 = (Lz - z)
@@ -94,33 +95,33 @@ T0z_top = (ez@(d3.grad(T)(z=Lz))).evaluate()
 
 
 #Do a BVP to set up initial T field -- this is just antidifferentiate but by hand :(.
-bvp_coords = d3.CartesianCoordinates('z')
-bvp_dist = d3.Distributor(bvp_coords, dtype=dtype, mesh=None, comm=MPI.COMM_SELF)
-bvp_zbasis = d3.ChebyshevT(bvp_coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
-bvp_z = bvp_dist.local_grids(bvp_zbasis)[0].flatten()
-bvp_ex, bvp_ey, bvp_ez = coords.unit_vector_fields(bvp_dist)
-bvp_T0 = Lz - bvp_z
-bvp_grad_T0 = -1
-grad_T_IC = bvp_dist.VectorField(bvp_coords, name='grad_T_IC', bases=bvp_zbasis)
-T_IC = bvp_dist.Field(name='T_IC', bases=bvp_zbasis)
-bvp_tau = bvp_dist.VectorField(bvp_coords, name='tau_IC')
-grad_T_IC['g']  = bvp_grad_T0*one_to_zero(bvp_z, Lz/2, width=0.05)
-grad_T_IC['g'] += bvp_grad_T0*zero_to_one(bvp_z, 0.95*Lz, width=0.05)
-T0_bot_IC = Lz
+#bvp_coords = d3.CartesianCoordinates('z')
+#bvp_dist = d3.Distributor(bvp_coords, dtype=dtype, mesh=None, comm=MPI.COMM_SELF)
+#bvp_zbasis = d3.ChebyshevT(bvp_coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
+#bvp_z = bvp_dist.local_grids(bvp_zbasis)[0].flatten()
+#bvp_ex, bvp_ey, bvp_ez = coords.unit_vector_fields(bvp_dist)
+#bvp_T0 = Lz - bvp_z
+#bvp_grad_T0 = -1
+#grad_T_IC = bvp_dist.VectorField(bvp_coords, name='grad_T_IC', bases=bvp_zbasis)
+#T_IC = bvp_dist.Field(name='T_IC', bases=bvp_zbasis)
+#bvp_tau = bvp_dist.VectorField(bvp_coords, name='tau_IC')
+#grad_T_IC['g']  = bvp_grad_T0*one_to_zero(bvp_z, Lz/2, width=0.05)
+#grad_T_IC['g'] += bvp_grad_T0*zero_to_one(bvp_z, 0.95*Lz, width=0.05)
+#T0_bot_IC = Lz
 
 #Solve BVP for T
-bvp_lift_basis = bvp_zbasis.derivative_basis(2)
-bvp_lift = lambda A, n: d3.Lift(A, bvp_lift_basis, n)
-bvp_problem = d3.LBVP([T_IC, bvp_tau], namespace=locals())
-bvp_problem.add_equation("grad(T_IC) + bvp_lift(bvp_tau,-1) = grad_T_IC")
-bvp_problem.add_equation("T_IC(z=0) = T0_bot_IC")
-bvp_solver = bvp_problem.build_solver()
-bvp_solver.solve()
+#bvp_lift_basis = bvp_zbasis.derivative_basis(2)
+#bvp_lift = lambda A, n: d3.Lift(A, bvp_lift_basis, n)
+#bvp_problem = d3.LBVP([T_IC, bvp_tau], namespace=locals())
+#bvp_problem.add_equation("grad(T_IC) + bvp_lift(bvp_tau,-1) = grad_T_IC")
+#bvp_problem.add_equation("T_IC(z=0) = T0_bot_IC")
+#bvp_solver = bvp_problem.build_solver()
+#bvp_solver.solve()
 
 #Properly slice from local BVP output to global simulation.
-grid_slices  = dist.layouts[-1].slices(u.domain, dealias)
-T_IC.change_scales(dealias)
-T['g'] = T_IC['g'][None,None,grid_slices[2]]
+#grid_slices  = dist.layouts[-1].slices(u.domain, dealias)
+#T_IC.change_scales(dealias)
+#T['g'] = T_IC['g'][None,None,grid_slices[2]]
 
 
 
@@ -136,7 +137,8 @@ problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omeg
 problem.add_equation("C(z=0) = C0_bot")
 problem.add_equation("T(z=0) = T0_bot")
 problem.add_equation("u(z=0) = 0")
-problem.add_equation("ez@(grad(C)(z=Lz)) = 0")
+#problem.add_equation("ez@(grad(C)(z=Lz)) = 0")
+problem.add_equation("d3.Differentiate(C, coords['z'])(z=Lz) = 0")
 problem.add_equation("ez@(grad(T)(z=Lz)) = T0z_top")
 problem.add_equation("ez@(u(z=Lz)) = 0")
 problem.add_equation("ex@shear_stress = 0")
@@ -144,9 +146,11 @@ problem.add_equation("ey@shear_stress = 0")
 problem.add_equation("integ(p) = 0") # Pressure gauge
 
 # Solver
-solver = problem.build_solver(timestepper)
+solver = problem.build_solver(timestepper,ncc_cutoff=1e-8)
 solver.stop_sim_time = stop_sim_time
+write, dt = solver.load_state('checkpoint/checkpoint_s23.h5', -1)
 
+"""
 # Initial conditions
 noise = dist.Field(name='noise', bases=bases)
 noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
@@ -166,8 +170,10 @@ C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
 #plt.legend()
 #plt.savefig('IC_{}.png'.format(MPI.COMM_WORLD.rank))
 
+"""
+
 # Analysis
-snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=0.25, max_writes=50)
+snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=1, max_writes=100)
 snapshots.add_task((T - inv_R*C)(x=aspect*Lz/2), name='buoyancy yz')
 snapshots.add_task((T - inv_R*C)(y=aspect*Lz/2), name='buoyancy xz')
 snapshots.add_task((T - inv_R*C)(x=aspect*Lz), name='buoyancy yz side')
@@ -189,8 +195,8 @@ snapshots.add_task((0.5*u@u)(z=0.75*Lz), name='kinetic energy')
 
 
 
-plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])
-profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.1, max_writes=50)
+plane_avg = lambda A: d3.Integrate(d3.Integrate(A, coords['x']),coords['y'])/((aspect*Lz)**2)
+profiles = solver.evaluator.add_file_handler('profiles', sim_dt=0.5, max_writes=100)
 profiles.add_task(plane_avg(T), name='T')
 profiles.add_task(plane_avg(dot(ez, u*T)), name='T_conv_flux')
 profiles.add_task(plane_avg(dot(ez, -kappaT*grad(T))), name='T_cond_flux')
@@ -207,13 +213,17 @@ profiles.add_task(plane_avg(-nu*dot(ez,d3.cross(u,vorticity))), name='viscous_fl
 profiles.add_task(plane_avg(FK_vert), name='KE_vert')
 profiles.add_task(plane_avg(FK_parallel), name='KE_parallel')
 
+#Scalar
+scalars = solver.evaluator.add_file_handler('scalars', sim_dt=0.5, max_writes=100)
+scalars.add_task(ez@grad(C)(z=Lz), name='Cz_top')
+
 # Checkpoint
-checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='virtual')
+checkpoint = solver.evaluator.add_file_handler('checkpoint', wall_dt=3600, max_writes=1, parallel='gather')
 checkpoint.add_tasks(solver.state, layout='g')
 
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=cfl_safety, threshold=0.1,
+CFL = d3.CFL(solver, initial_dt=dt, cadence=1, safety=cfl_safety, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
