@@ -1,17 +1,17 @@
 from collections import OrderedDict
 
 parameters = OrderedDict()
-parameters['Nz'] = 256
+parameters['Nz'] = 512
 parameters['Nx'] = 128
 parameters['Lz'] = 2
-parameters['aspect'] = 0.5
+parameters['aspect'] = 1 
 
-parameters['Rayleigh'] = 1e8
+parameters['Rayleigh'] = 1e7
 parameters['Prandtl'] = 0.5
-parameters['Taylor'] = 3e9
+parameters['Taylor'] = 3e7
 parameters['tau'] = parameters['Prandtl']
-parameters['tau_bg'] = 4e-3
-parameters['inv_R'] = 2.5
+parameters['tau_bg'] = 3e-3
+parameters['inv_R'] = 10 
 parameters['dealias'] = 3/2
-parameters['stop_sim_time'] = 2e4
+parameters['stop_sim_time'] = 5e4
 

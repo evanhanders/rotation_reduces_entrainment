@@ -15,7 +15,9 @@ plotter = SlicePlotter(root_dir, file_dir=data_dir, out_name=out_name, start_fil
 #plotter_kwargs = { 'col_inch' : float(args['--col_inch']), 'row_inch' : float(args['--row_inch']) }
 plotter_kwargs = { 'col_inch' : 8, 'row_inch' : 8 }
 
-plotter.setup_grid(num_rows=1, num_cols=2, **plotter_kwargs)
-plotter.add_colormesh('vorticity xz', x_basis='x', y_basis='z', remove_x_mean=True)
-plotter.add_colormesh('vorticity xy', x_basis='x', y_basis='y', remove_mean=True)
+plotter.setup_grid(num_rows=2, num_cols=2, **plotter_kwargs)
+plotter.add_colormesh('vorticity xz', x_basis='x', y_basis='z', cmap='PuOr_r', remove_x_mean=True)
+plotter.add_colormesh('vorticity xy', x_basis='x', y_basis='y', cmap='PuOr_r', remove_mean=True)
+plotter.add_colormesh('buoyancy xz', x_basis='x', y_basis='z', remove_x_mean=True)
+plotter.add_colormesh('buoyancy xy', x_basis='x', y_basis='y', remove_mean=True)
 plotter.plot_colormeshes(start_fig=start_fig, dpi=200)
