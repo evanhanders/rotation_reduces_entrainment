@@ -132,7 +132,7 @@ problem.add_equation("trace(grad_u) + tau_p = 0")
 problem.add_equation("dt(T) - kappaT*div(grad_T) + lift(tau_T2) = - (u@grad(T))")
 problem.add_equation("dt(C) - kappaC*div(grad_C)    + lift(tau_C2) = - (u@grad(C))", condition="(nx != 0) or  (ny != 0)")
 problem.add_equation("dt(C) - kappaC_bg*div(grad_C) + lift(tau_C2) = - (u@grad(C))", condition="(nx == 0) and (ny == 0)")
-problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez - omega*(cross(ez,u)) + lift(tau_u2) = - cross(vorticity,u)")
+problem.add_equation("dt(u) - nu*div(grad_u) + grad(p) - (T - inv_R*C)*ez + omega*(cross(ez,u)) + lift(tau_u2) = - cross(vorticity,u)")
 problem.add_equation("C(z=0) = C0_bot")
 problem.add_equation("T(z=0) = T0_bot")
 problem.add_equation("u(z=0) = 0")
@@ -146,19 +146,24 @@ problem.add_equation("integ(p) = 0") # Pressure gauge
 # Solver
 solver = problem.build_solver(timestepper)
 solver.stop_sim_time = stop_sim_time
+restart = None
+if restart is not None:
+    write, timestep = solver.load_state(restart)
+    initial_timestep = timestep
+else:
+    # Initial conditions
+    noise = dist.Field(name='noise', bases=bases)
+    noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
+    noise.low_pass_filter(scales=0.25)
 
-# Initial conditions
-noise = dist.Field(name='noise', bases=bases)
-noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
-noise.low_pass_filter(scales=0.25)
+    noise.change_scales(dealias)
+    T.change_scales(dealias)
+    C.change_scales(dealias)
+    T['g'] += noise['g']
 
-noise.change_scales(dealias)
-T.change_scales(dealias)
-C.change_scales(dealias)
-T['g'] += noise['g']
-
-C['g'] *= one_to_zero(z_de, 0.5*Lz, width=0.05)
-C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
+    C['g'] *= one_to_zero(z_de, 0.5*Lz, width=0.05)
+    C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
+    initial_timestep = max_timestep
 
 #import matplotlib.pyplot as plt
 #plt.plot(z_de.ravel(), C['g'][0,0,:], label='C')
@@ -217,7 +222,7 @@ checkpoint.add_tasks(solver.state, layout='g')
 
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=max_timestep, cadence=1, safety=cfl_safety, threshold=0.1,
+CFL = d3.CFL(solver, initial_dt=initial_timestep, cadence=1, safety=cfl_safety, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
