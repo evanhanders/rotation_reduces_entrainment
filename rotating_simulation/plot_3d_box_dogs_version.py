@@ -93,7 +93,7 @@ cmaps = ['PuOr_r']
 #colorbar_x = [0.45, 0.97]
 colorbar_dict=dict(lenmode='fraction', thicknessmode = 'fraction', len=0.25, thickness=0.02)
 fig = go.Figure(layout={'width': x_pix, 'height': y_pix})
-fig = make_subplots(rows=1, cols=1, specs=[[{'is_3d': True},]], subplot_titles=field_names, horizontal_spacing=0.025)
+fig = make_subplots(rows=1, cols=1, specs=[[{'is_3d': True},]], horizontal_spacing=0.025)
 scene_dict = {          'xaxis': {'showbackground':False, 'tickvals':[], 'title':''}, 
                         'yaxis': {'showbackground':False, 'tickvals':[], 'title':''}, 
                         'zaxis': {'showbackground':False, 'tickvals':[], 'title':''} }
@@ -130,10 +130,15 @@ for file in ["./snapshots/non_rotating/snapshots_s8.h5"]:
                 
                 
                 #This could change for your run
+                #x = f['scales']['x_hash_ea83cf3c8dc6521f5bb4237afe0ace05c278fff6'][()].squeeze()
+                #y = f['scales']['y_hash_ea83cf3c8dc6521f5bb4237afe0ace05c278fff6'][()].squeeze()
+                #z = f['scales']['z_hash_423c9d8e34a53d507027e5295ba685a53e4fafe2'][()].squeeze()
                 
-                x = f['scales']['x_hash_ea83cf3c8dc6521f5bb4237afe0ace05c278fff6'][()].squeeze()
-                y = f['scales']['y_hash_ea83cf3c8dc6521f5bb4237afe0ace05c278fff6'][()].squeeze()
-                z = f['scales']['z_hash_423c9d8e34a53d507027e5295ba685a53e4fafe2'][()].squeeze()
+                coords = list(f['scales'])
+                
+                x = f['scales'][coords[-3]][()].squeeze()
+                y = f['scales'][coords[-2]][()].squeeze()
+                z = f['scales'][coords[-1]][()].squeeze()
             
         
             x_max, x_min = (x.max(), x.min())
