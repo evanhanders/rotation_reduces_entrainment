@@ -123,7 +123,8 @@ if not plotter.idle:
             side_list = [xy_side, xz_side, yz_side, xy_mid, xz_mid, yz_mid]
 
             cmap = matplotlib.cm.get_cmap(cmaps[ind])
-            vmin, vmax = get_minmax(left_field, cmap_exclusion=0.01)
+            if first:
+                vmin, vmax = get_minmax(top_field, cmap_exclusion=0.1)
             norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
 
             for i, d in enumerate(side_list):
@@ -143,7 +144,9 @@ if not plotter.idle:
                 grid.pl.update(force_redraw=True)
                 grid.pl.update_scalar_bar_range([vmin, vmax])
 
-       # Save figure
+        titleactor = grid.pl.add_title('t={:.3e}'.format(time_data['sim_time'][ni]), color='black')
+
+        # Save figure
         savepath = '{:s}/{:s}_{:06d}.png'.format(plotter.out_dir, fig_name, time_data['write_number'][ni])
         grid.save(savepath)
         first = False
