@@ -91,6 +91,7 @@ if not plotter.idle:
         color='black'
     )
 
+    clims = []
 
     data_dicts = []
     while plotter.writes_remain():
@@ -125,6 +126,10 @@ if not plotter.idle:
             cmap = matplotlib.cm.get_cmap(cmaps[ind])
             if first:
                 vmin, vmax = get_minmax(top_field, cmap_exclusion=0.1)
+                vmin = plotter.comm.allreduce(np.array((vmin,)), op=MPI.MIN)
+                vmax = plotter.comm.allreduce(np.array((vmax,)), op=MPI.MAX)
+                clims.append((vmin, vmax))
+            vmin, vmax = clims[ind]
             norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
 
             for i, d in enumerate(side_list):
