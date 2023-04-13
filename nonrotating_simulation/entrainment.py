@@ -94,37 +94,6 @@ C0_bot = C(z=0).evaluate()
 T0z_top = (ez@(d3.grad(T)(z=Lz))).evaluate()
 
 
-#Do a BVP to set up initial T field -- this is just antidifferentiate but by hand :(.
-#bvp_coords = d3.CartesianCoordinates('z')
-#bvp_dist = d3.Distributor(bvp_coords, dtype=dtype, mesh=None, comm=MPI.COMM_SELF)
-#bvp_zbasis = d3.ChebyshevT(bvp_coords['z'], size=Nz, bounds=(0, Lz), dealias=dealias)
-#bvp_z = bvp_dist.local_grids(bvp_zbasis)[0].flatten()
-#bvp_ex, bvp_ey, bvp_ez = coords.unit_vector_fields(bvp_dist)
-#bvp_T0 = Lz - bvp_z
-#bvp_grad_T0 = -1
-#grad_T_IC = bvp_dist.VectorField(bvp_coords, name='grad_T_IC', bases=bvp_zbasis)
-#T_IC = bvp_dist.Field(name='T_IC', bases=bvp_zbasis)
-#bvp_tau = bvp_dist.VectorField(bvp_coords, name='tau_IC')
-#grad_T_IC['g']  = bvp_grad_T0*one_to_zero(bvp_z, Lz/2, width=0.05)
-#grad_T_IC['g'] += bvp_grad_T0*zero_to_one(bvp_z, 0.95*Lz, width=0.05)
-#T0_bot_IC = Lz
-
-#Solve BVP for T
-#bvp_lift_basis = bvp_zbasis.derivative_basis(2)
-#bvp_lift = lambda A, n: d3.Lift(A, bvp_lift_basis, n)
-#bvp_problem = d3.LBVP([T_IC, bvp_tau], namespace=locals())
-#bvp_problem.add_equation("grad(T_IC) + bvp_lift(bvp_tau,-1) = grad_T_IC")
-#bvp_problem.add_equation("T_IC(z=0) = T0_bot_IC")
-#bvp_solver = bvp_problem.build_solver()
-#bvp_solver.solve()
-
-#Properly slice from local BVP output to global simulation.
-#grid_slices  = dist.layouts[-1].slices(u.domain, dealias)
-#T_IC.change_scales(dealias)
-#T['g'] = T_IC['g'][None,None,grid_slices[2]]
-
-
-
 # Problem
 # First-order form: "div(f)" becomes "trace(grad_f)"
 # First-order form: "lap(f)" becomes "div(grad_f)"
@@ -148,29 +117,25 @@ problem.add_equation("integ(p) = 0") # Pressure gauge
 # Solver
 solver = problem.build_solver(timestepper,ncc_cutoff=1e-8)
 solver.stop_sim_time = stop_sim_time
-write, dt = solver.load_state('checkpoint/checkpoint_s23.h5', -1)
 
-"""
-# Initial conditions
-noise = dist.Field(name='noise', bases=bases)
-noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
-noise.low_pass_filter(scales=0.25)
+use_checkpoint = True
+timestep = max_timestep
+if use_checkpoint:
+    write, timestep = solver.load_state('checkpoint/checkpoint_s23.h5', -1)
+else:
+    # Initial conditions
+    noise = dist.Field(name='noise', bases=bases)
+    noise.fill_random('g', seed=42, distribution='normal', scale=1e-5) # Random noise
+    noise.low_pass_filter(scales=0.25)
 
-noise.change_scales(dealias)
-T.change_scales(dealias)
-C.change_scales(dealias)
-T['g'] += noise['g']
+    noise.change_scales(dealias)
+    T.change_scales(dealias)
+    C.change_scales(dealias)
+    T['g'] += noise['g']
 
-C['g'] *= one_to_zero(z_de, 0.5*Lz, width=0.05)
-C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
+    C['g'] *= one_to_zero(z_de, 0.5*Lz, width=0.05)
+    C['g'] += 0.5*zero_to_one(z_de, 0.5*Lz, width=0.05)
 
-#import matplotlib.pyplot as plt
-#plt.plot(z_de.ravel(), C['g'][0,0,:], label='C')
-#plt.plot(z_de.ravel(), T['g'][0,0,:], label='T')
-#plt.legend()
-#plt.savefig('IC_{}.png'.format(MPI.COMM_WORLD.rank))
-
-"""
 
 # Analysis
 snapshots = solver.evaluator.add_file_handler('snapshots', sim_dt=1, max_writes=100)
@@ -223,7 +188,7 @@ checkpoint.add_tasks(solver.state, layout='g')
 
 
 # CFL
-CFL = d3.CFL(solver, initial_dt=dt, cadence=1, safety=cfl_safety, threshold=0.1,
+CFL = d3.CFL(solver, initial_dt=timestep, cadence=1, safety=cfl_safety, threshold=0.1,
              max_change=1.5, min_change=0.5, max_dt=max_timestep)
 CFL.add_velocity(u)
 
