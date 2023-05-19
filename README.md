@@ -1,5 +1,6 @@
 # rotation_reduces_entrainment
 This repository contains the files used to run the simulations presented in the article "Rotation reduces mixing of composition gradients in Jupiter and other gas giants" by J.R. Fuentes et al.
+This repository is backed up on zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7950923.svg)](https://doi.org/10.5281/zenodo.7950923)
 
 ## Dependencies
 
